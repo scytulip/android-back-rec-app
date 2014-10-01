@@ -14,24 +14,15 @@
  * limitations under the License.
  */
 
-package com.nordicsemi.nrfUARTv2;
+package com.scytulip.nrfUARTbackrec;
 
 
 
-
-import java.io.UnsupportedEncodingException;
-import java.text.DateFormat;
-import java.util.Date;
-
-
-import com.nordicsemi.nrfUARTv2.UartService;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothManager;
-
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -40,25 +31,24 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.support.v4.content.LocalBroadcastManager;
+
+import java.io.UnsupportedEncodingException;
+import java.text.DateFormat;
+import java.util.Date;
 
 public class MainActivity extends Activity implements RadioGroup.OnCheckedChangeListener {
     private static final int REQUEST_SELECT_DEVICE = 1;
@@ -77,10 +67,15 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
     private BluetoothAdapter mBtAdapter = null;
     private ListView messageListView;
     private ArrayAdapter<String> listAdapter;
-    private Button btnConnectDisconnect,btnSend;
+    private Button btnConnectDisconnect,btnSend,btnDwnd;
     private EditText edtMessage;
+
+    private boolean mFileInTransit;    //<Mark of file transfer status
+    private BackRecData mBackData;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        Log.i(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -95,10 +90,11 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         messageListView.setDivider(null);
         btnConnectDisconnect=(Button) findViewById(R.id.btn_select);
         btnSend=(Button) findViewById(R.id.sendButton);
+        btnDwnd=(Button) findViewById(R.id.dlButton);
         edtMessage = (EditText) findViewById(R.id.sendText);
         service_init();
 
-     
+        mBackData = new BackRecData(getApplicationContext());
        
         // Handler Disconnect & Connect button
         btnConnectDisconnect.setOnClickListener(new View.OnClickListener() {
@@ -150,6 +146,19 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                 
             }
         });
+
+        // Handler Download Button
+        btnDwnd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    mService.writeRXCharacteristic("T".getBytes("UTF-8"));
+                } catch (Exception e) {
+                    Log.i(TAG, e.toString());
+                }
+
+            }
+        });
      
         // Set initial UI state
         
@@ -186,6 +195,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
 
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+            String strEcho;
 
             final Intent mIntent = intent;
            //*********************//
@@ -197,6 +207,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                              btnConnectDisconnect.setText("Disconnect");
                              edtMessage.setEnabled(true);
                              btnSend.setEnabled(true);
+                             btnDwnd.setEnabled(true);
                              ((TextView) findViewById(R.id.deviceName)).setText(mDevice.getName()+ " - ready");
                              listAdapter.add("["+currentDateTimeString+"] Connected to: "+ mDevice.getName());
                         	 	messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
@@ -214,6 +225,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                              btnConnectDisconnect.setText("Connect");
                              edtMessage.setEnabled(false);
                              btnSend.setEnabled(false);
+                             btnDwnd.setEnabled(false);
                              ((TextView) findViewById(R.id.deviceName)).setText("Not Connected");
                              listAdapter.add("["+currentDateTimeString+"] Disconnected to: "+ mDevice.getName());
                              mState = UART_PROFILE_DISCONNECTED;
@@ -233,19 +245,56 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             if (action.equals(UartService.ACTION_DATA_AVAILABLE)) {
               
                  final byte[] txValue = intent.getByteArrayExtra(UartService.EXTRA_DATA);
-                 runOnUiThread(new Runnable() {
-                     public void run() {
-                         try {
-                         	String text = new String(txValue, "UTF-8");
-                         	String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-                        	 	listAdapter.add("["+currentDateTimeString+"] RX: "+text);
-                        	 	messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
-                        	
-                         } catch (Exception e) {
-                             Log.e(TAG, e.toString());
-                         }
+                 try {
+                     strEcho = new String(txValue, "UTF-8");
+
+                     if (strEcho.equals("**START**")) { // Start recording file
+
+                         mFileInTransit = true;
+                         btnDwnd.setEnabled(false);
+                         mBackData.clearAll();
+
+                         String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                         listAdapter.add("[" + currentDateTimeString + "] Start Downloading...");
+                         messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+
+                         return;
+
+                     } else if (strEcho.equals("**END**")) { // Stop recording file
+
+                         mBackData.writeToBinaryFile();
+                         mService.writeRXCharacteristic("I".getBytes("UTF-8"));
+                         btnDwnd.setEnabled(true);
+
+                         String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                         listAdapter.add("[" + currentDateTimeString + "] File Transfer is finished.");
+                         messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+
+                         mFileInTransit = false;
+
+                         return;
                      }
-                 });
+                 } catch (Exception e) {
+                     Log.i(TAG, e.toString());
+                 }
+
+                 if (mFileInTransit) { // File is in transit. Append received data to the data pool.
+                     mBackData.appendData(txValue);
+                 } else {
+                     runOnUiThread(new Runnable() {
+                         public void run() {
+                             try {
+                                 String text = new String(txValue, "UTF-8");
+                                 String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                                 listAdapter.add("[" + currentDateTimeString + "] RX: " + text);
+                                 messageListView.smoothScrollToPosition(listAdapter.getCount() - 1);
+
+                             } catch (Exception e) {
+                                 Log.e(TAG, e.toString());
+                             }
+                         }
+                     });
+                 }
              }
            //*********************//
             if (action.equals(UartService.DEVICE_DOES_NOT_SUPPORT_UART)){

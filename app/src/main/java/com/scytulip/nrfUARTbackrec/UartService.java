@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nordicsemi.nrfUARTv2;
+package com.scytulip.nrfUARTbackrec;
 
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -30,8 +30,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+import android.support.v4.content.LocalBroadcastManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -54,17 +54,17 @@ public class UartService extends Service {
     private static final int STATE_CONNECTED = 2;
 
     public final static String ACTION_GATT_CONNECTED =
-            "com.nordicsemi.nrfUART.ACTION_GATT_CONNECTED";
+            "com.scytulip.nrfUART.ACTION_GATT_CONNECTED";
     public final static String ACTION_GATT_DISCONNECTED =
-            "com.nordicsemi.nrfUART.ACTION_GATT_DISCONNECTED";
+            "com.scytulip.nrfUART.ACTION_GATT_DISCONNECTED";
     public final static String ACTION_GATT_SERVICES_DISCOVERED =
-            "com.nordicsemi.nrfUART.ACTION_GATT_SERVICES_DISCOVERED";
+            "com.scytulip.nrfUART.ACTION_GATT_SERVICES_DISCOVERED";
     public final static String ACTION_DATA_AVAILABLE =
-            "com.nordicsemi.nrfUART.ACTION_DATA_AVAILABLE";
+            "com.scytulip.nrfUART.ACTION_DATA_AVAILABLE";
     public final static String EXTRA_DATA =
-            "com.nordicsemi.nrfUART.EXTRA_DATA";
+            "com.scytulip.nrfUART.EXTRA_DATA";
     public final static String DEVICE_DOES_NOT_SUPPORT_UART =
-            "com.nordicsemi.nrfUART.DEVICE_DOES_NOT_SUPPORT_UART";
+            "com.scytulip.nrfUART.DEVICE_DOES_NOT_SUPPORT_UART";
     
     public static final UUID TX_POWER_UUID = UUID.fromString("00001804-0000-1000-8000-00805f9b34fb");
     public static final UUID TX_POWER_LEVEL_UUID = UUID.fromString("00002a07-0000-1000-8000-00805f9b34fb");

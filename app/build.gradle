@@ -2,12 +2,14 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 18
-    buildToolsVersion "19.0.3"
+    buildToolsVersion "19.1.0"
 
     defaultConfig {
-        applicationId "com.nordicsemi.nrfUARTv2"
+        applicationId "com.scytulip.nrfUARTbackrec"
         minSdkVersion 18
         targetSdkVersion 18
+        versionCode 1
+        versionName "1.0"
     }
 
     buildTypes {
@@ -15,5 +17,9 @@ android {
             runProguard false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
+    }
+
+    dependencies {
+        compile "com.android.support:support-v4:19.1.+"
     }
 }
